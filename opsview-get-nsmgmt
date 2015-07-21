@@ -1,0 +1,62 @@
+require 'rest-client'
+require 'json'
+require 'pp'
+
+url = "http://your.opsviewserver.net"
+myusername = "user"
+mypassword = "pass"
+monitoredserver = "opsviewmonitored.server.net"
+
+
+class OpsviewRest
+  attr_accessor :url, :username, :password, :rest
+
+  def initialize(url, options = {})
+    options = {
+      :username => username,
+      :password =>  password,
+      :connect  => true
+    }.update options
+
+    @url      = url
+    @username = options[:username]
+    @password = options[:password]
+    @rest     = RestClient::Resource.new("#{@url}/rest/", :headers => { :content_type => 'application/json' })
+    login(@url) if options[:connect]
+  end
+
+  def login(url)
+    response = RestClient.post("#{@url}/rest/login", { 'username' => @username, 'password' => @password })
+    
+    @mysession =  response.cookies["opsview_web_session"]
+    @token =  response.split("\"")[3]
+    
+    @carry_headers = { 
+    :cookies => {'opsview_web_session' => @mysession}, 
+    :auth_type => 'basic', 
+    :username => @username, 
+    :password => @password, 
+    :content_type => 'application/json', 
+    :x_opsview_username => @username, 
+    :x_opsview_token => @token 
+    }
+    response
+  end
+
+  def logout
+    delete('login')
+  end
+ 
+  def getServiceStatus(host)
+    result = RestClient.get("#{@url}/rest/status/service?hostname=#{host}",  @carry_headers )
+    return result.body
+   end
+
+
+# class end
+end
+
+
+
+connection = OpsviewRest.new(url, :username => myusername, :password => mypassword)
+print connection.getServiceStatus(monitoredserver)
